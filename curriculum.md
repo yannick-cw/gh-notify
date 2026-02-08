@@ -203,10 +203,10 @@ Run with `npm run dev` and verify:
 ### Key Takeaway
 Production TypeScript needs: validated config, structured logging, and typed errors. These patterns prevent debugging nightmares later.
 
-### Interview Relevance
-- "How do you handle configuration in Node.js applications?"
-- "What's the benefit of structured logging?"
-- "How do you handle errors in TypeScript?"
+### Key Learnings
+- Zod schemas give you validated, typed config at the boundary - fail fast on startup, not at runtime
+- Structured logging (pino) produces machine-parseable JSON, making production debugging possible at scale
+- ADT error types (`Result<T, E>`) make error paths explicit in the type system instead of hiding them in thrown exceptions
 
 ---
 
@@ -390,13 +390,12 @@ OAuth2 authorization code flow: redirect user -> user consents -> receive code -
 - Step 8: Token delivered securely
 - Step 9: Encrypted at rest
 
-### Interview Relevance
-- "Explain the OAuth2 authorization code flow"
-- "Why use OAuth2 instead of API keys?"
-- "How do you securely store tokens?"
-- "What is CSRF protection in OAuth?"
-- "What's the difference between the code and the token?"
-- "Why does the code go through the browser but the token doesn't?"
+### Key Learnings
+- OAuth2 authorization code flow separates user consent (front-channel, browser) from token exchange (back-channel, server-to-server) - this split is the core security property
+- The `state` parameter prevents CSRF by binding the OAuth redirect to a session you initiated - without it, an attacker can inject their own authorization code
+- API keys mean "the app has access"; OAuth2 means "the user granted the app access" - the distinction matters for auditing, revocation, and least-privilege
+- Tokens should be encrypted at rest (AES-256-GCM) - storing plaintext secrets on disk is a single file read away from compromise
+- The authorization code is deliberately short-lived and single-use, so even if intercepted in the browser, it is useless without the client secret
 
 ---
 
@@ -462,10 +461,10 @@ This verifies everything works end-to-end.
 ### Key Takeaway
 API clients should: validate responses, handle errors gracefully, respect rate limits, and be well-typed.
 
-### Interview Relevance
-- "How do you handle API rate limits?"
-- "How do you type external API responses?"
-- "What's the benefit of mapping external errors to domain errors?"
+### Key Learnings
+- Validating API responses with Zod at the boundary catches breaking changes and unexpected shapes before they propagate through your code
+- Rate limit awareness (reading `X-RateLimit-Remaining`) prevents silent failures - you want to log warnings and back off before GitHub starts returning 403s
+- Mapping external errors to domain errors (`ApiError`) decouples your application logic from the specific API provider - your filters and agent don't need to know about HTTP status codes
 
 ---
 
@@ -678,10 +677,10 @@ Iterate on prompts based on results.
 ### Key Takeaway
 Agent workflows shine when each step requires judgment. Tools fetch data; agents reason about it.
 
-### Interview Relevance
-- "How do you design agent workflows?"
-- "What should be a tool vs agent logic?"
-- "How do you test LLM-based systems?"
+### Key Learnings
+- Multi-step workflows let you decompose complex reasoning into focused stages (triage, contextualize, summarize) where each step has a clear contract
+- Tools fetch data; agents reason about it - if the logic can be expressed as a deterministic rule, it belongs in code, not in a prompt
+- Structured JSON output (not prose) from agent steps makes the decisions testable, loggable, and composable with downstream steps
 
 ---
 
