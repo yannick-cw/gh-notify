@@ -2,8 +2,49 @@ import z from "zod";
 import { env } from "../config.js"
 import { authError, err, ok, Result } from "../errors.js";
 import { logger } from "../logger.js";
+import { Hono } from "hono";
+import { serve, ServerType } from "@hono/node-server";
+import { readTkn, storeTkn } from "./token-store.js";
+import { exec } from "node:child_process";
 
 const callBackURL = "http://localhost:3000/callback";
+
+const app = new Hono();
+var localState: string;
+var closableServer: ServerType;
+
+app.get("/", c => {
+    localState = crypto.randomUUID()
+    return c.redirect(buildAuthUrl(localState))
+})
+app.get("/callback", async (c) => {
+    const code = c.req.query("code")
+    const state = c.req.query("state")
+    // if state matches we do exchange now
+    if (state == localState && code) {
+        const tknResult = await exchangeCodeForToken(code)
+        if (tknResult.ok) {
+            logger.info("Token exchange successful");
+            await storeTkn(tknResult.value)
+            setTimeout(() => {
+                closableServer.close();
+                logger.info("Auth complete, server shut down.");
+            }, 500);
+            return c.html("<h1>Success!</h1><p>You can close this window.</p>")
+        } else {
+            logger.error({ error: tknResult.error }, "Token exchange failed");
+            return c.html("<h1>Fail!</h1><p>Token exchange failed: " + tknResult.error.message + "</p>");
+        }
+    } else {
+        return c.html("<h1>Fail!</h1><p>Something went wrong</p>")
+    }
+})
+
+export function startGithubTknServer() {
+    closableServer = serve({ fetch: app.fetch, port: 3000 });
+    exec("open http://localhost:3000");
+    logger.info("Browser opened, waiting for authorization...");
+}
 
 function buildAuthUrl(state: string): string {
     const authUrl = new URL(`https://github.com/login/oauth/authorize?${new URLSearchParams({
@@ -15,7 +56,7 @@ function buildAuthUrl(state: string): string {
     return authUrl.toString()
 }
 
-type Token = string
+export type Token = string
 const tknSchema = z.object({ access_token: z.string() })
 
 async function exchangeCodeForToken(code: string): Promise<Result<Token>> {
