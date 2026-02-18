@@ -1,5 +1,6 @@
 import { readTkn } from "./auth/token-store.js";
 import { env } from "./config.js";
+import { fetchNotifications } from "./github/notifications.js";
 import { logger } from "./logger.js";
 
 async function main() {
@@ -11,18 +12,11 @@ async function main() {
 
     if (!tkn.ok) {
         return logger.error(tkn.error.message)
-    } else {
-
-        const testUrl = new URL("https://api.github.com/user");
-        const headers = {
-            "Authorization": `Bearer ${tkn.value}`,
-            "Accept": "application/json"
-        };
-        const gitRes = await fetch(testUrl, { headers })
-        const jsonRes = await gitRes.json()
-
-        logger.info(jsonRes, "Response from API")
     }
+
+    const notifications = await fetchNotifications(tkn.value)
+
+    logger.info(notifications, "Response from API")
 }
 
 main().catch(console.error);
