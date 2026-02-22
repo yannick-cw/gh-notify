@@ -2,12 +2,23 @@ import z from "zod";
 import { Result } from "../errors.js";
 import { getGithub } from "./api.js";
 
-const prSchema = z.object({
+export const prSchema = z.object({
     title: z.string(),
     body: z.string().nullable(),
+    html_url: z.string(),
     state: z.string(),
+    draft: z.boolean(),
+    merged: z.boolean(),
+    created_at: z.string(),
+    updated_at: z.string(),
     user: z.object({
         login: z.string(),
+    }),
+    head: z.object({
+        ref: z.string(),
+    }),
+    base: z.object({
+        ref: z.string(),
     }),
     requested_reviewers: z.array(z.object({
         login: z.string(),

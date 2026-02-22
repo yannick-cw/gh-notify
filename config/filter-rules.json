@@ -1,0 +1,5 @@
+[
+  { "kind": "INCLUDE", "reason": "mention" },
+  { "kind": "INCLUDE", "reason": "review_requested" },
+  { "kind": "EXCLUDE", "reason": "team_mention" }
+]

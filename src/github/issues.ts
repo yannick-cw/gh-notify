@@ -2,13 +2,20 @@ import z from "zod";
 import { Result } from "../errors.js";
 import { getGithub } from "./api.js";
 
-const issueSchema = z.object({
+export const issueSchema = z.object({
     title: z.string(),
     body: z.string().nullable(),
+    html_url: z.string(),
     state: z.string(),
+    state_reason: z.string().nullable(),
+    created_at: z.string(),
+    updated_at: z.string(),
     user: z.object({
         login: z.string(),
     }),
+    assignees: z.array(z.object({
+        login: z.string(),
+    })),
     labels: z.array(z.object({
         name: z.string(),
     })),

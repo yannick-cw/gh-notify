@@ -3,7 +3,11 @@ import { Result } from "../errors.js";
 import { getGithub } from "./api.js";
 
 
-const notificationsUrl = "https://api.github.com/notifications"
+const defaultSince = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString();
+
+function notificationsUrl(since: string = defaultSince): string {
+    return `https://api.github.com/notifications?all=true&since=${since}`;
+}
 
 const notificationSchema = z.object({
     id: z.string(),
@@ -15,15 +19,20 @@ const notificationSchema = z.object({
     }),
     reason: z.string(),
     unread: z.boolean(),
+    updated_at: z.string(),
+    last_read_at: z.string().nullable(),
     repository: z.object({
         full_name: z.string(),
+        owner: z.object({
+            login: z.string(),
+        }),
     }),
 });
 
-const notificationsSchema = z.array(notificationSchema)
+export const notificationsSchema = z.array(notificationSchema)
 
-type GitNotification = z.infer<typeof notificationSchema>;
+export type GitNotification = z.infer<typeof notificationSchema>;
 
-export async function fetchNotifications(token: string): Promise<Result<GitNotification[]>> {
-    return await getGithub(token, notificationsUrl, notificationsSchema)
+export async function fetchNotifications(token: string, since?: string): Promise<Result<GitNotification[]>> {
+    return await getGithub(token, notificationsUrl(since), notificationsSchema)
 }
