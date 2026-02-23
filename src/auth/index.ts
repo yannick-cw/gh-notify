@@ -1,4 +1,4 @@
-import { env } from "process";
+import { env } from "../config.js";
 import { logger } from "../logger.js";
 import { startGithubTknServer } from "./github.js";
 

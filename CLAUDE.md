@@ -28,7 +28,7 @@ This is a **learning project** following the curriculum in `curriculum.md`. The 
 
 **Status: Phase 4**
 
-**Next up:** Phase 4, Multi-step Mastra Agent Workflow
+**Next up:** Phase 4, Exercise 4.4 - Contextualize step (getPRDetails/getIssueDetails, ignore/inform/urgent decision)
 
 **Completed:**
 
@@ -50,6 +50,9 @@ This is a **learning project** following the curriculum in `curriculum.md`. The 
 - Phase 3, Exercise 3.2: Apply filters (whitelist via INCLUDE, blacklist fallback via EXCLUDE)
 - Phase 3, Exercise 3.3: Configurable rules (loaded from config/filter-rules.json, Zod-validated)
 - Phase 3, Exercise 3.4: Tested with real data (fetch + filter + log in index.ts)
+- Phase 4, Exercise 4.1: Mastra agent setup (Agent, Mastra, openai/gpt-4o-mini)
+- Phase 4, Exercise 4.2: GitHub tools (fetchNotificationsTool wrapping fetch + filter)
+- Phase 4, Exercise 4.3: Triage step (createWorkflow, .map() for prompt bridging, structuredOutput, Result return type, verified with real data)
 
 ## Build Commands
 

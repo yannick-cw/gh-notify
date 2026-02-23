@@ -1,3 +1,4 @@
+import { runTriageWorkflow } from "./agent/index.js";
 import { readTkn } from "./auth/token-store.js";
 import { env } from "./config.js";
 import { applyFilters, parseRulesFromConfig } from "./filters/index.js";
@@ -5,8 +6,6 @@ import { fetchNotifications } from "./github/notifications.js";
 import { logger } from "./logger.js";
 
 async function main() {
-    const validenv = env
-
     logger.info(env, "booting up...")
 
     const tkn = await readTkn()
@@ -20,17 +19,22 @@ async function main() {
         return logger.error(tkn.error.message)
     }
 
-    const notifications = await fetchNotifications(tkn.value)
+    // why: old manual way
+    // const notifications = await fetchNotifications(tkn.value)
+    // if (!notifications.ok) {
+    //     return logger.error(notifications.error.message)
+    // }
+    // logger.info(notifications.value, "Response from API")
+    // const filteredNotifications = applyFilters(notifications.value, notificationRules.value)
+    // logger.info(filteredNotifications, "Notifcations have been filtered")
 
-    if (!notifications.ok) {
-        return logger.error(notifications.error.message)
+    const res = await runTriageWorkflow(tkn.value, notificationRules.value)
+
+    if (!res.ok) {
+        return logger.error(res.error.message)
     }
 
-    logger.info(notifications.value, "Response from API")
-
-    const filteredNotifications = applyFilters(notifications.value, notificationRules.value)
-
-    logger.info(filteredNotifications, "Notifcations have been filtered")
+    logger.info(res.value, "Workflow Output")
 }
 
 main().catch(console.error);

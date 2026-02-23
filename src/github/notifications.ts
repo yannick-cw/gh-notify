@@ -3,7 +3,8 @@ import { Result } from "../errors.js";
 import { getGithub } from "./api.js";
 
 
-const defaultSince = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString();
+const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
+const defaultSince = new Date(Date.now() - THREE_DAYS_MS).toISOString();
 
 function notificationsUrl(since: string = defaultSince): string {
     return `https://api.github.com/notifications?all=true&since=${since}`;
