@@ -29,6 +29,8 @@
   "dependencies": {
     "@hono/node-server": "^1.19.9",
     "@mastra/core": "^1.5.0",
+    "@mastra/langfuse": "^1.0.3",
+    "@mastra/observability": "^1.2.1",
     "dotenv": "^17.2.4",
     "hono": "^4.11.9",
     "pino": "^10.3.0",
