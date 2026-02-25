@@ -5,122 +5,81 @@ import z from "zod";
 import { env, langfuseConf } from "../config.js";
 import { agentError, err, ok, Result } from "../errors.js";
 import { FilterRule } from "../filters/rules.js";
-import { GitNotification, notificationsSchema } from "../github/notifications.js";
+import { EnrichedNotification, enrichedNotificationsSchema } from "../github/notifications.js";
 import { fetchNotificationsTool, getIssueDetailsTool, getPRDetailsTool } from "./tools.js";
 
-const triageAgentOut = z.array(z.object({ id: z.string(), reason: z.string() }))
 const decisionAgentOut = z.array(z.object({
     decisions: z.enum(["ignore", "inform", "urgent"]),
-    id: z.string().describe("notification id"), summary: z.string().describe("Why you took the decision.")
+    id: z.string().describe("notification id"),
+    summary: z.string().describe("Why you took the decision.")
 }))
 
-const triageAgentInstructions = `
-    You are triaging GitHub notifications for a software engineer.
-    Given a list of notifications, decide which ones warrant further investigation.
-    The user is yannick-cw in Github.
-    IGNORE if the notification was read before, treat all as unread. It might be read due to notifications shared via email.
-
-    Consider:
-    - Direct @mentions are usually important
-    - Review requests should be looked at
-    - Notifications in repos the user owns are higher priority
-    - add your reason, short sentence, why you kept it
-
-    Return output matching the schema.
-`;
-
 const decisionAgentInstructions = `
-You are an agent deciding which GitHub notifications are important for a software engineer right now.
-You receive a list of notifications (notifications and reason why they are kept).
-You MUST resolve more information for the notifications by fetching either the issue or the PR request.
-The user is not interested in notifications that request review from a team he is in, but if review is
-directly request. Notifications that indicate a new comment on a review the user is part of (a reply to the users comment for example) are
-especially important.
-The user is yannick-cw in Github.
-Decide how important this is:
+You are an agent deciding which GitHub notifications need attention for yannick-cw.
 
-- IGNORE: Not actionable, just FYI
-- INFORM: Worth knowing about, but not urgent
-- URGENT: Needs attention soon
+Each notification has been pre-enriched with context. For each notification:
 
-Consider: Is the user being asked a question? Is a review blocking someone? Is there a deadline?
+1. reason is "review_requested":
+   - requested_reviewers and requested_teams are already embedded in the notification
+   - "yannick-cw" is in requested_reviewers → URGENT (direct request)
+   - Only teams listed, not yannick-cw directly → IGNORE
+
+2. All other reasons (comment, mention, author, subscribed):
+   - latest_comment is already embedded if available - use it to make the decision
+   - If latest_comment is missing, call getPRDetailsTool or getIssueDetailsTool as fallback
+   - URGENT if someone is waiting for your input, asking you a question, or your review is blocking progress
+   - INFORM if it is a relevant update worth knowing about
+   - IGNORE if not actionable
 
 Return output matching the schema.
 `
 
-type NotificationsToHandle = z.infer<typeof triageAgentOut>;
 type Decisions = z.infer<typeof decisionAgentOut>;
 
 export async function runTriageWorkflow(tkn: string, filters: FilterRule[]): Promise<Result<Decisions>> {
-    const triageAgent = new Agent({
-        id: "triage-agent",
-        name: "triage-agent",
-        model: "openai/gpt-5-mini",
-        instructions: triageAgentInstructions,
-    });
-
     const decisionAgent = new Agent({
         id: "decision-agent",
         name: "decision-agent",
-        model: "openai/gpt-5-mini",
+        model: "openai/gpt-4o-mini",
         instructions: decisionAgentInstructions,
         tools: { getPRTool: getPRDetailsTool(tkn), getIssueDetailsTool: getIssueDetailsTool(tkn) }
     });
-
 
     // TODO: output error schema?
     const fetchNotificationsStep = createStep({
         id: "fetch-and-filter-notifications",
         inputSchema: z.object({}),
-        outputSchema: notificationsSchema,
+        outputSchema: enrichedNotificationsSchema,
         execute: async ({ inputData, requestContext }) => {
             const result = await fetchNotificationsTool(tkn, filters).execute!({}, { requestContext })
             if (result instanceof Error) throw result;
-
-            // why: safety measure for now - only take top 10
-            return (result as GitNotification[]).slice(0, 10);
+            return result as EnrichedNotification[];
         },
     });
 
-    const triageOpts: AgentStepOptions<NotificationsToHandle> = { structuredOutput: { schema: triageAgentOut } }
     const decisionOpts: AgentStepOptions<Decisions> = { structuredOutput: { schema: decisionAgentOut } }
-
-    const agentTriageStep = createStep(triageAgent, triageOpts);
     const agentDecisionStep = createStep(decisionAgent, decisionOpts);
 
-    const testWorkflow = createWorkflow({
+    const triageWorkflow = createWorkflow({
         id: "triage-workflow",
         inputSchema: z.object({}),
         outputSchema: decisionAgentOut,
     })
         .then(fetchNotificationsStep)
         .map(async (d) => ({ prompt: JSON.stringify(d.inputData) }))
-        .then(agentTriageStep)
-        .map(async (d) => {
-            const gitNotifications = d.getStepResult<GitNotification[] | undefined>("fetch-and-filter-notifications")
-            if (gitNotifications === undefined) {
-                throw Error("Failed to get notifiactions from step 1")
-            }
-            const enrichedNotifications = d.inputData.map(({ id, reason }) => {
-                const originalN = gitNotifications.find(n => n.id === id)
-                return { id, reason, ...originalN }
-            })
-
-            return { prompt: JSON.stringify(enrichedNotifications) }
-        })
         .then(agentDecisionStep)
         .commit();
 
+
+    // TODO enrich ouput
     const mastra = new Mastra({
-        agents: { triageAgent, decisionAgent },
-        workflows: { testWorkflow },
+        agents: { decisionAgent },
+        workflows: { triageWorkflow },
         ...(env.LANGFUSE_PUBLIC_KEY && env.LANGFUSE_SECRET_KEY ? langfuseConf : {}),
     });
-    const wf = mastra.getWorkflow("testWorkflow");
 
-
-    const run = await wf.createRun()
-
+    const wf = mastra.getWorkflow("triageWorkflow");
+    const run = await wf.createRun();
     const result = await run.start({ inputData: {} });
 
     if (result.status === "failed") {

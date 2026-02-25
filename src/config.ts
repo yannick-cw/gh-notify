@@ -30,7 +30,7 @@ export const langfuseConf = {
                         publicKey: env.LANGFUSE_PUBLIC_KEY,
                         secretKey: env.LANGFUSE_SECRET_KEY,
                         baseUrl: env.LANGFUSE_BASE_URL,
-                        realtime: true,
+                        realtime: false,
                     }),
                 ],
             },

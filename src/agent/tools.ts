@@ -1,27 +1,65 @@
 import { createTool } from "@mastra/core/tools";
 import z from "zod";
-import { fetchNotifications, notificationsSchema } from "../github/notifications.js";
+import { fetchNotifications, enrichedNotificationsSchema, EnrichedNotification } from "../github/notifications.js";
 import { FilterRule } from "../filters/rules.js";
 import { applyFilters } from "../filters/index.js";
 import { getPRDetails, prSchema } from "../github/pull-requests.js";
 import { getIssueDetails, issueSchema } from "../github/issues.js";
+import { getComment } from "../github/comments.js";
 
 export const fetchNotificationsTool = (tkn: string, filters: FilterRule[]) => createTool({
     id: "fetch-github-notifications-tool",
-    description: `Fetches all recent notifications from GitHub from all kind of places.
-                    Use this to get the initial notifications.
-                    They are already filtered to a subset of notifications.
-                    Only recent notifications are returned. Last three hours.
+    description: `Fetches all recent notifications from GitHub (last 3 days), filtered by rules.
+                    Notifications are pre-enriched:
+                    - review_requested on PRs include requested_reviewers and requested_teams
+                    - Notifications with a latest_comment_url include the fetched latest_comment
                     Rules are: ${JSON.stringify(filters)}`,
     inputSchema: z.object({}),
-    outputSchema: notificationsSchema,
+    outputSchema: enrichedNotificationsSchema,
     execute: async () => {
-        const filteredNotifications = await fetchNotifications(tkn);
+        const result = await fetchNotifications(tkn);
 
-        if (!filteredNotifications.ok) {
-            return Promise.reject(filteredNotifications.error)
+        if (!result.ok) {
+            return Promise.reject(result.error)
         }
-        return applyFilters(filteredNotifications.value, filters)
+
+        const filtered = applyFilters(result.value, filters).slice(0, 10);
+
+        const enriched: EnrichedNotification[] = await Promise.all(
+            filtered.map(async (n): Promise<EnrichedNotification> => {
+                const enrichments: Partial<EnrichedNotification> = {};
+
+                const [prResult, commentResult] = await Promise.all([
+                    n.reason === "review_requested" && n.subject.type === "PullRequest"
+                        ? (() => {
+                            const [owner, repo] = n.repository.full_name.split("/");
+                            const number = parseInt(n.subject.url.split("/").pop()!, 10);
+                            return getPRDetails(tkn, owner, repo, number);
+                        })()
+                        : null,
+                    n.subject.latest_comment_url !== null
+                        ? getComment(tkn, n.subject.latest_comment_url)
+                        : null,
+                ]);
+
+                if (prResult?.ok) {
+                    enrichments.requested_reviewers = prResult.value.requested_reviewers;
+                    enrichments.requested_teams = prResult.value.requested_teams;
+                }
+
+                if (commentResult?.ok) {
+                    enrichments.latest_comment = {
+                        body: commentResult.value.body,
+                        user: commentResult.value.user,
+                        state: commentResult.value.state,
+                    };
+                }
+
+                return { ...n, ...enrichments };
+            })
+        );
+
+        return enriched;
     },
 });
 

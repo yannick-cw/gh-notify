@@ -34,6 +34,19 @@ export const notificationsSchema = z.array(notificationSchema)
 
 export type GitNotification = z.infer<typeof notificationSchema>;
 
+export const enrichedNotificationSchema = notificationSchema.extend({
+    requested_reviewers: z.array(z.object({ login: z.string() })).optional(),
+    requested_teams: z.array(z.object({ name: z.string(), slug: z.string() })).optional(),
+    latest_comment: z.object({
+        body: z.string().nullable(),
+        user: z.object({ login: z.string() }),
+        state: z.string().optional(),
+    }).optional(),
+});
+
+export const enrichedNotificationsSchema = z.array(enrichedNotificationSchema);
+export type EnrichedNotification = z.infer<typeof enrichedNotificationSchema>;
+
 export async function fetchNotifications(token: string, since?: string): Promise<Result<GitNotification[]>> {
     return await getGithub(token, notificationsUrl(since), notificationsSchema)
 }

@@ -27,9 +27,9 @@ export const prSchema = z.object({
         name: z.string(),
         slug: z.string(),
     })),
-    changed_files: z.number(),
-    additions: z.number(),
-    deletions: z.number(),
+    // changed_files: z.number(),
+    // additions: z.number(),
+    // deletions: z.number(),
 });
 
 export type PRDetails = z.infer<typeof prSchema>;
