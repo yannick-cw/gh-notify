@@ -3,13 +3,13 @@ import z from "zod";
 import { fetchNotifications, enrichedNotificationsSchema, EnrichedNotification } from "../github/notifications.js";
 import { FilterRule } from "../filters/rules.js";
 import { applyFilters } from "../filters/index.js";
-import { getPRDetails, prSchema } from "../github/pull-requests.js";
+import { getPRDetails, getPRReviews, prReviewsSchema, prSchema } from "../github/pull-requests.js";
 import { getIssueDetails, issueSchema } from "../github/issues.js";
 import { getComment } from "../github/comments.js";
 
-export const fetchNotificationsTool = (tkn: string, filters: FilterRule[]) => createTool({
+export const fetchNotificationsTool = (tkn: string, filters: FilterRule[], since: string) => createTool({
     id: "fetch-github-notifications-tool",
-    description: `Fetches all recent notifications from GitHub (last 3 days), filtered by rules.
+    description: `Fetches all recent notifications from GitHub, filtered by rules.
                     Notifications are pre-enriched:
                     - review_requested on PRs include requested_reviewers and requested_teams
                     - Notifications with a latest_comment_url include the fetched latest_comment
@@ -23,6 +23,7 @@ export const fetchNotificationsTool = (tkn: string, filters: FilterRule[]) => cr
             return Promise.reject(result.error)
         }
 
+        // latest 10 for now
         const filtered = applyFilters(result.value, filters).slice(0, 10);
 
         const enriched: EnrichedNotification[] = await Promise.all(
@@ -82,6 +83,24 @@ export const getPRDetailsTool = (tkn: string) => createTool({
             return Promise.reject(prDetailsResult.error);
         }
         return prDetailsResult.value;
+    },
+});
+
+export const getPRReviewsTool = (tkn: string) => createTool({
+    id: "get-github-pr-reviews-tool",
+    description: `Fetches reviews submitted on a PR.
+                    Returns only new reviews: APPROVED, CHANGES_REQUESTED, COMMENTED, DISMISSED.
+                    Use this to understand what changed on a PR you authored or are reviewing.`,
+    inputSchema: z.object({
+        owner: z.string(),
+        repo: z.string(),
+        number: z.number().describe("The PR number"),
+    }),
+    outputSchema: prReviewsSchema,
+    execute: async ({ owner, repo, number }) => {
+        const result = await getPRReviews(tkn, owner, repo, number);
+        if (!result.ok) return Promise.reject(result.error);
+        return result.value;
     },
 });
 

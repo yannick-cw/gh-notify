@@ -5,8 +5,8 @@ import z from "zod";
 import { env, langfuseConf } from "../config.js";
 import { agentError, err, ok, Result } from "../errors.js";
 import { FilterRule } from "../filters/rules.js";
-import { EnrichedNotification, enrichedNotificationsSchema } from "../github/notifications.js";
-import { fetchNotificationsTool, getIssueDetailsTool, getPRDetailsTool } from "./tools.js";
+import { defaultSince, EnrichedNotification, enrichedNotificationsSchema } from "../github/notifications.js";
+import { fetchNotificationsTool, getIssueDetailsTool, getPRDetailsTool, getPRReviewsTool } from "./tools.js";
 
 const decisionAgentOut = z.array(z.object({
     decisions: z.enum(["ignore", "inform", "urgent"]),
@@ -21,15 +21,20 @@ Each notification has been pre-enriched with context. For each notification:
 
 1. reason is "review_requested":
    - requested_reviewers and requested_teams are already embedded in the notification
-   - "yannick-cw" is in requested_reviewers → URGENT (direct request)
+   - "yannick-cw" is in requested_reviewers → INFORM (direct request) STATE in summary that yannick-cw's review was requested
    - Only teams listed, not yannick-cw directly → IGNORE
 
 2. All other reasons (comment, mention, author, subscribed):
    - latest_comment is already embedded if available - use it to make the decision
    - If latest_comment is missing, call getPRDetailsTool or getIssueDetailsTool as fallback
+   - For PullRequest notifications where reason is "author": call getPRReviewsTo    ol to see what changed (new reviews, approvals, change requests)
+   - all new input on PRs since the notifications since given in prompt are new
+   - when reason is author, never ignore, at most INFORM
+   - CHANGES_REQUESTED  → URGENT (action required on your PR)
+   - COMMENTED with new comments -> URGENT
+   - APPROVED  → INFORM
    - URGENT if someone is waiting for your input, asking you a question, or your review is blocking progress
    - INFORM if it is a relevant update worth knowing about
-   - IGNORE if not actionable
 
 Return output matching the schema.
 `
@@ -40,18 +45,17 @@ export async function runTriageWorkflow(tkn: string, filters: FilterRule[]): Pro
     const decisionAgent = new Agent({
         id: "decision-agent",
         name: "decision-agent",
-        model: "openai/gpt-4o-mini",
+        model: "openai/gpt-5-mini",
         instructions: decisionAgentInstructions,
-        tools: { getPRTool: getPRDetailsTool(tkn), getIssueDetailsTool: getIssueDetailsTool(tkn) }
+        tools: { getPRTool: getPRDetailsTool(tkn), getIssueDetailsTool: getIssueDetailsTool(tkn), getPRReviewsTool: getPRReviewsTool(tkn) }
     });
 
-    // TODO: output error schema?
     const fetchNotificationsStep = createStep({
         id: "fetch-and-filter-notifications",
         inputSchema: z.object({}),
         outputSchema: enrichedNotificationsSchema,
         execute: async ({ inputData, requestContext }) => {
-            const result = await fetchNotificationsTool(tkn, filters).execute!({}, { requestContext })
+            const result = await fetchNotificationsTool(tkn, filters, defaultSince).execute!({}, { requestContext })
             if (result instanceof Error) throw result;
             return result as EnrichedNotification[];
         },
@@ -66,12 +70,11 @@ export async function runTriageWorkflow(tkn: string, filters: FilterRule[]): Pro
         outputSchema: decisionAgentOut,
     })
         .then(fetchNotificationsStep)
-        .map(async (d) => ({ prompt: JSON.stringify(d.inputData) }))
+        .map(async (d) => ({ prompt: `notifications since ${defaultSince}: ${JSON.stringify(d.inputData)}` }))
         .then(agentDecisionStep)
         .commit();
 
 
-    // TODO enrich ouput
     const mastra = new Mastra({
         agents: { decisionAgent },
         workflows: { triageWorkflow },

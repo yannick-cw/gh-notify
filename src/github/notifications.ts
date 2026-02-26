@@ -4,7 +4,7 @@ import { getGithub } from "./api.js";
 
 
 const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
-const defaultSince = new Date(Date.now() - THREE_DAYS_MS).toISOString();
+export const defaultSince = new Date(Date.now() - THREE_DAYS_MS).toISOString();
 
 function notificationsUrl(since: string = defaultSince): string {
     return `https://api.github.com/notifications?all=true&since=${since}`;

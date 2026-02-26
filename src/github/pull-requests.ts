@@ -1,6 +1,7 @@
 import z from "zod";
-import { Result } from "../errors.js";
+import { ok, Result } from "../errors.js";
 import { getGithub } from "./api.js";
+import { logger } from "../logger.js";
 
 export const prSchema = z.object({
     title: z.string(),
@@ -36,4 +37,19 @@ export type PRDetails = z.infer<typeof prSchema>;
 
 export async function getPRDetails(token: string, owner: string, repo: string, number: number): Promise<Result<PRDetails>> {
     return await getGithub(token, `https://api.github.com/repos/${owner}/${repo}/pulls/${number}`, prSchema)
+}
+
+export const prReviewSchema = z.object({
+    id: z.number(),
+    user: z.object({ login: z.string() }),
+    state: z.enum(["APPROVED", "CHANGES_REQUESTED", "COMMENTED", "DISMISSED", "PENDING"]),
+    submitted_at: z.string().nullable(),
+    body: z.string(),
+});
+
+export const prReviewsSchema = z.array(prReviewSchema);
+export type PRReview = z.infer<typeof prReviewSchema>;
+
+export async function getPRReviews(token: string, owner: string, repo: string, number: number): Promise<Result<PRReview[]>> {
+    return await getGithub(token, `https://api.github.com/repos/${owner}/${repo}/pulls/${number}/reviews`, prReviewsSchema);
 }
