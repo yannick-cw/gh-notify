@@ -775,7 +775,9 @@ Create `src/slack/index.ts`:
 
 1. Implement `sendSlackMessage(webhookUrl: string, message: string)`
 2. Handle errors (webhook invalid, Slack down, etc.)
+--- continue with rendering the message
 3. Support basic formatting (bold, links, emoji)
+4. we'll also need a bit more info than the current response (repo > pr name > link)
 
 > Stuck? See [Solution 5.2](#solution-52-create-slack-tool) at the bottom.
 
@@ -783,7 +785,8 @@ Create `src/slack/index.ts`:
 
 Update Step 3 (Summarize) to call the Slack tool at the end.
 
-Add a `sendSlackTool` to the agent's tool set.
+Add a `sendSlackTool` to the agent's tool set. No this can just be a manual step!
+ADd it to workflow as step though
 
 ### Exercise 5.4: Test Full Flow
 

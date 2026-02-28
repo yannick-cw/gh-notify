@@ -26,9 +26,9 @@ This is a **learning project** following the curriculum in `curriculum.md`. The 
 
 ## Current Progress
 
-**Status: Phase 4**
+**Status: Phase 5**
 
-**Next up:** Phase 4, Exercise 4.4 - Contextualize step (getPRDetails/getIssueDetails, ignore/inform/urgent decision)
+**Next up:** Phase 5, Exercise 5.3 - Integrate Slack with workflow (add as a step, not just manual call in index.ts). Also Exercise 4.5 (Summarize step - compose formatted Slack message grouped by urgency) is still pending.
 
 **Completed:**
 
@@ -53,6 +53,9 @@ This is a **learning project** following the curriculum in `curriculum.md`. The 
 - Phase 4, Exercise 4.1: Mastra agent setup (Agent, Mastra, openai/gpt-4o-mini)
 - Phase 4, Exercise 4.2: GitHub tools (fetchNotificationsTool wrapping fetch + filter)
 - Phase 4, Exercise 4.3: Triage step (createWorkflow, .map() for prompt bridging, structuredOutput, Result return type, verified with real data)
+- Phase 4, Exercise 4.4: Contextualize step (getPRReviewsTool added, agent instructions updated with ignore/inform/urgent rules per review state, since-based filtering via notification last_read_at)
+- Phase 5, Exercise 5.1: Slack webhook registered (SLACK_WEBHOOK_URL in env)
+- Phase 5, Exercise 5.2: sendSlackMessage implemented (POST to webhook, double-check HTTP status + body text, Result return type)
 
 ## Build Commands
 

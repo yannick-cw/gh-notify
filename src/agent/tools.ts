@@ -17,7 +17,7 @@ export const fetchNotificationsTool = (tkn: string, filters: FilterRule[], since
     inputSchema: z.object({}),
     outputSchema: enrichedNotificationsSchema,
     execute: async () => {
-        const result = await fetchNotifications(tkn);
+        const result = await fetchNotifications(tkn, since);
 
         if (!result.ok) {
             return Promise.reject(result.error)

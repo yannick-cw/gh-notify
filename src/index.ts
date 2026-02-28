@@ -1,9 +1,9 @@
 import { runTriageWorkflow } from "./agent/index.js";
 import { readTkn } from "./auth/token-store.js";
 import { env } from "./config.js";
-import { applyFilters, parseRulesFromConfig } from "./filters/index.js";
-import { fetchNotifications } from "./github/notifications.js";
+import { parseRulesFromConfig } from "./filters/index.js";
 import { logger } from "./logger.js";
+import { sendSlackMessage } from "./slack/index.js";
 
 async function main() {
     logger.info(env, "booting up...")
@@ -35,6 +35,10 @@ async function main() {
     }
 
     logger.info(res.value, "Workflow Output")
+
+    // if (env.SLACK_WEBHOOK_URL) {
+    //     await sendSlackMessage(env.SLACK_WEBHOOK_URL, JSON.stringify(res.value))
+    // }
 }
 
 main().catch(console.error);

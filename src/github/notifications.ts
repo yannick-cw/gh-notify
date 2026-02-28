@@ -6,7 +6,7 @@ import { getGithub } from "./api.js";
 const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
 export const defaultSince = new Date(Date.now() - THREE_DAYS_MS).toISOString();
 
-function notificationsUrl(since: string = defaultSince): string {
+function notificationsUrl(since: string): string {
     return `https://api.github.com/notifications?all=true&since=${since}`;
 }
 
@@ -47,6 +47,6 @@ export const enrichedNotificationSchema = notificationSchema.extend({
 export const enrichedNotificationsSchema = z.array(enrichedNotificationSchema);
 export type EnrichedNotification = z.infer<typeof enrichedNotificationSchema>;
 
-export async function fetchNotifications(token: string, since?: string): Promise<Result<GitNotification[]>> {
+export async function fetchNotifications(token: string, since: string): Promise<Result<GitNotification[]>> {
     return await getGithub(token, notificationsUrl(since), notificationsSchema)
 }
