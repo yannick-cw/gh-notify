@@ -24,10 +24,15 @@ export const prSchema = z.object({
     requested_reviewers: z.array(z.object({
         login: z.string(),
     })),
+    assignees: z.array(z.object({
+        login: z.string(),
+    })),
     requested_teams: z.array(z.object({
         name: z.string(),
         slug: z.string(),
     })),
+    comments_url: z.string(),
+    review_comments_url: z.string(),
     // changed_files: z.number(),
     // additions: z.number(),
     // deletions: z.number(),

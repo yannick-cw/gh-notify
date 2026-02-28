@@ -7,6 +7,7 @@ import { agentError, err, ok, Result } from "../errors.js";
 import { FilterRule } from "../filters/rules.js";
 import { defaultSince, EnrichedNotification, enrichedNotificationsSchema } from "../github/notifications.js";
 import { fetchNotificationsTool, getIssueDetailsTool, getPRDetailsTool, getPRReviewsTool } from "./tools.js";
+import { sendSlackMessage } from "../slack/index.js";
 
 const decisionAgentOut = z.array(z.object({
     decisions: z.enum(["ignore", "inform", "urgent"]),
@@ -24,28 +25,34 @@ Each notification has been pre-enriched with context. For each notification:
    - "yannick-cw" is in requested_reviewers → INFORM (direct request) STATE in summary that yannick-cw's review was requested
    - Only teams listed, not yannick-cw directly → IGNORE
 
-2. All other reasons (comment, mention, author, subscribed):
+2. reason is "comment" on a PullRequest:
+   - pr_participants contains logins of everyone who commented (inline + discussion)
+   - "yannick-cw" NOT in pr_participants → IGNORE (team subscription noise, not personally involved)
+   - "yannick-cw" in pr_participants → use latest_comment content to decide urgency
+
+3. All other reasons (mention, author, subscribed):
    - latest_comment is already embedded if available - use it to make the decision
    - If latest_comment is missing, call getPRDetailsTool or getIssueDetailsTool as fallback
-   - For PullRequest notifications where reason is "author": call getPRReviewsTo    ol to see what changed (new reviews, approvals, change requests)
+   - For PullRequest notifications where reason is "author": call getPRReviewsTool to see what changed (new reviews, approvals, change requests)
    - all new input on PRs since the notifications since given in prompt are new
    - when reason is author, never ignore, at most INFORM
-   - CHANGES_REQUESTED  → URGENT (action required on your PR)
-   - COMMENTED with new comments -> URGENT
-   - APPROVED  → INFORM
+   - CHANGES_REQUESTED → URGENT (action required on your PR)
+   - COMMENTED with new comments → URGENT
+   - APPROVED → INFORM
    - URGENT if someone is waiting for your input, asking you a question, or your review is blocking progress
    - INFORM if it is a relevant update worth knowing about
+   - if a notification has already been read, this has no significance for the decision, as it can be because of an email sent or so
 
 Return output matching the schema.
 `
 
 type Decisions = z.infer<typeof decisionAgentOut>;
 
-export async function runTriageWorkflow(tkn: string, filters: FilterRule[]): Promise<Result<Decisions>> {
+export async function runNotificationWorkflow(tkn: string, filters: FilterRule[], slackHook: string): Promise<Result<Decisions>> {
     const decisionAgent = new Agent({
         id: "decision-agent",
         name: "decision-agent",
-        model: "openai/gpt-5-mini",
+        model: "anthropic/claude-sonnet-4-6",
         instructions: decisionAgentInstructions,
         tools: { getPRTool: getPRDetailsTool(tkn), getIssueDetailsTool: getIssueDetailsTool(tkn), getPRReviewsTool: getPRReviewsTool(tkn) }
     });
@@ -61,6 +68,20 @@ export async function runTriageWorkflow(tkn: string, filters: FilterRule[]): Pro
         },
     });
 
+    const exportToSlack = createStep({
+        id: "send-notifiactions-to-slack",
+        inputSchema: decisionAgentOut,
+        outputSchema: decisionAgentOut,
+        execute: async ({ inputData }) => {
+            const msg = JSON.stringify(inputData)
+            const slackRes = await sendSlackMessage(slackHook, msg)
+            if (!slackRes.ok) {
+                throw Error("Sending to slack failed.")
+            }
+            return inputData
+        },
+    })
+
     const decisionOpts: AgentStepOptions<Decisions> = { structuredOutput: { schema: decisionAgentOut } }
     const agentDecisionStep = createStep(decisionAgent, decisionOpts);
 
@@ -72,6 +93,7 @@ export async function runTriageWorkflow(tkn: string, filters: FilterRule[]): Pro
         .then(fetchNotificationsStep)
         .map(async (d) => ({ prompt: `notifications since ${defaultSince}: ${JSON.stringify(d.inputData)}` }))
         .then(agentDecisionStep)
+        // .then(exportToSlack)
         .commit();
 
 

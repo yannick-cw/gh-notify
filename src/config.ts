@@ -7,7 +7,7 @@ const envSchema = z.object({
     GITHUB_CLIENT_ID: z.string().min(1, "GitHub Client ID is required"),
     GITHUB_CLIENT_SECRET: z.string().min(1, "GitHub Client Secret is required"),
     TOKEN_ENCRYPTION_KEY: z.string().length(32, "Encryption key must be 32 characters"),
-    OPENAI_API_KEY: z.string().optional(),
+    ANTHROPIC_API_KEY: z.string().optional(),
     SLACK_WEBHOOK_URL: z.url().optional(),
     LANGFUSE_PUBLIC_KEY: z.string().optional(),
     LANGFUSE_SECRET_KEY: z.string().optional(),

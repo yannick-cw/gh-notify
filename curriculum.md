@@ -778,6 +778,7 @@ Create `src/slack/index.ts`:
 --- continue with rendering the message
 3. Support basic formatting (bold, links, emoji)
 4. we'll also need a bit more info than the current response (repo > pr name > link)
+5. de-duplicate for the same PR / issue
 
 > Stuck? See [Solution 5.2](#solution-52-create-slack-tool) at the bottom.
 

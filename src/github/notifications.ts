@@ -42,6 +42,7 @@ export const enrichedNotificationSchema = notificationSchema.extend({
         user: z.object({ login: z.string() }),
         state: z.string().optional(),
     }).optional(),
+    pr_participants: z.array(z.object({ login: z.string() })).optional(),
 });
 
 export const enrichedNotificationsSchema = z.array(enrichedNotificationSchema);

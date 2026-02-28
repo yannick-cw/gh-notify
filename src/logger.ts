@@ -11,7 +11,7 @@ const transport = env.NODE_ENV === 'development'
 const secretKeys = [
     "GITHUB_CLIENT_SECRET",
     "TOKEN_ENCRYPTION_KEY",
-    "OPENAI_API_KEY",
+    "ANTHROPIC_API_KEY",
 ] as const satisfies readonly (keyof Config)[];
 
 export const logger = pino({

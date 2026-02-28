@@ -11,6 +11,13 @@
     "resolveJsonModule": true,
     "isolatedModules": true
   },
-  "include": ["src/**/*", "tests/**/*"],
-  "exclude": ["node_modules", "dist"]
+  "include": [
+    "src/**/*",
+    "tests/**/*",
+    "src/config.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
 }
