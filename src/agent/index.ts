@@ -7,13 +7,24 @@ import { agentError, err, ok, Result } from "../errors.js";
 import { FilterRule } from "../filters/rules.js";
 import { defaultSince, EnrichedNotification, enrichedNotificationsSchema } from "../github/notifications.js";
 import { fetchNotificationsTool, getIssueDetailsTool, getPRDetailsTool, getPRReviewsTool } from "./tools.js";
-import { sendSlackMessage } from "../slack/index.js";
+import { formatForSlack, sendSlackMessage } from "../slack/index.js";
 
-const decisionAgentOut = z.array(z.object({
-    decisions: z.enum(["ignore", "inform", "urgent"]),
-    id: z.string().describe("notification id"),
-    summary: z.string().describe("Why you took the decision.")
-}))
+const decisionAgentOut = z.array(
+    z.object({
+        decisions: z.enum(["ignore", "inform", "urgent"]),
+        id: z.string().describe("notification id"),
+        summary: z.string().describe("Why you took the decision."),
+    }),
+);
+
+const slackExportIn = z.array(
+    decisionAgentOut.element.extend({
+        repo: z.string().optional(),
+        title: z.string().optional(),
+        reason: z.string().optional(),
+        url: z.string().optional(),
+    }),
+);
 
 const decisionAgentInstructions = `
 You are an agent deciding which GitHub notifications need attention for yannick-cw.
@@ -44,17 +55,25 @@ Each notification has been pre-enriched with context. For each notification:
    - if a notification has already been read, this has no significance for the decision, as it can be because of an email sent or so
 
 Return output matching the schema.
-`
+`;
 
 type Decisions = z.infer<typeof decisionAgentOut>;
 
-export async function runNotificationWorkflow(tkn: string, filters: FilterRule[], slackHook: string): Promise<Result<Decisions>> {
+export async function runNotificationWorkflow(
+    tkn: string,
+    filters: FilterRule[],
+    slackHook: string,
+): Promise<Result<Decisions>> {
     const decisionAgent = new Agent({
         id: "decision-agent",
         name: "decision-agent",
         model: "anthropic/claude-sonnet-4-6",
         instructions: decisionAgentInstructions,
-        tools: { getPRTool: getPRDetailsTool(tkn), getIssueDetailsTool: getIssueDetailsTool(tkn), getPRReviewsTool: getPRReviewsTool(tkn) }
+        tools: {
+            getPRTool: getPRDetailsTool(tkn),
+            getIssueDetailsTool: getIssueDetailsTool(tkn),
+            getPRReviewsTool: getPRReviewsTool(tkn),
+        },
     });
 
     const fetchNotificationsStep = createStep({
@@ -62,27 +81,30 @@ export async function runNotificationWorkflow(tkn: string, filters: FilterRule[]
         inputSchema: z.object({}),
         outputSchema: enrichedNotificationsSchema,
         execute: async ({ inputData, requestContext }) => {
-            const result = await fetchNotificationsTool(tkn, filters, defaultSince).execute!({}, { requestContext })
+            const result = await fetchNotificationsTool(tkn, filters, defaultSince).execute!({}, { requestContext });
             if (result instanceof Error) throw result;
             return result as EnrichedNotification[];
         },
     });
 
+    type EnrichedResults = z.infer<typeof slackExportIn>;
     const exportToSlack = createStep({
         id: "send-notifiactions-to-slack",
-        inputSchema: decisionAgentOut,
+        inputSchema: slackExportIn,
         outputSchema: decisionAgentOut,
         execute: async ({ inputData }) => {
-            const msg = JSON.stringify(inputData)
-            const slackRes = await sendSlackMessage(slackHook, msg)
+            // TODO new method in slack/index.ts
+            // it formats all info very nicely, top has urgent, then inform, then ignore sections
+            const formattedSlackResult = formatForSlack(inputData);
+            const slackRes = await sendSlackMessage(slackHook, formattedSlackResult);
             if (!slackRes.ok) {
-                throw Error("Sending to slack failed.")
+                throw Error("Sending to slack failed.");
             }
-            return inputData
+            return inputData;
         },
-    })
+    });
 
-    const decisionOpts: AgentStepOptions<Decisions> = { structuredOutput: { schema: decisionAgentOut } }
+    const decisionOpts: AgentStepOptions<Decisions> = { structuredOutput: { schema: decisionAgentOut } };
     const agentDecisionStep = createStep(decisionAgent, decisionOpts);
 
     const triageWorkflow = createWorkflow({
@@ -93,9 +115,29 @@ export async function runNotificationWorkflow(tkn: string, filters: FilterRule[]
         .then(fetchNotificationsStep)
         .map(async (d) => ({ prompt: `notifications since ${defaultSince}: ${JSON.stringify(d.inputData)}` }))
         .then(agentDecisionStep)
-        // .then(exportToSlack)
-        .commit();
+        .map(async (d) => {
+            const notificationStepRes = d.getStepResult<EnrichedNotification[] | undefined>(fetchNotificationsStep.id);
 
+            if (notificationStepRes) {
+                const inputData: EnrichedResults = d.inputData.map((decision) => {
+                    const matchingEnrichedData = notificationStepRes.find((res) => res.id === decision.id);
+
+                    return {
+                        ...decision,
+                        repo: matchingEnrichedData?.repository.full_name,
+                        title: matchingEnrichedData?.subject.title,
+                        reason: matchingEnrichedData?.reason,
+                        url: matchingEnrichedData?.subject.url
+                            .replace("api.github.com/repos", "github.com")
+                            .replace("/pulls/", "/pull/"),
+                    };
+                });
+                return inputData;
+            }
+            return d.inputData;
+        })
+        .then(exportToSlack)
+        .commit();
 
     const mastra = new Mastra({
         agents: { decisionAgent },
@@ -108,11 +150,11 @@ export async function runNotificationWorkflow(tkn: string, filters: FilterRule[]
     const result = await run.start({ inputData: {} });
 
     if (result.status === "failed") {
-        return err(agentError(result.error.message))
+        return err(agentError(result.error.message));
     }
 
     if (result.status !== "success") {
-        return err(agentError(result.status))
+        return err(agentError(result.status));
     }
 
     return ok(result.result);

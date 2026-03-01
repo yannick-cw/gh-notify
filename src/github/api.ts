@@ -4,8 +4,8 @@ import { logger } from "../logger.js";
 
 export async function getGithub<T>(token: string, url: string, schema: z.ZodType<T>): Promise<Result<T>> {
     const headers = {
-        "Authorization": `Bearer ${token}`,
-        "Accept": "application/json",
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
     };
 
     const githubRes = await fetch(url, { headers });
@@ -24,11 +24,10 @@ export async function getGithub<T>(token: string, url: string, schema: z.ZodType
     const parsed = schema.safeParse(json);
 
     if (!parsed.success) {
-        const issues = parsed.error.issues.map(i => `${i.path.join(".")}: ${i.message}`);
+        const issues = parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`);
         logger.error({ issues, body: json }, "Error parsing Github response.");
         return err(apiError(issues.join("; ")));
     }
 
     return ok(parsed.data);
-
 }

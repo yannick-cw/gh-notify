@@ -21,16 +21,22 @@ export const prSchema = z.object({
     base: z.object({
         ref: z.string(),
     }),
-    requested_reviewers: z.array(z.object({
-        login: z.string(),
-    })),
-    assignees: z.array(z.object({
-        login: z.string(),
-    })),
-    requested_teams: z.array(z.object({
-        name: z.string(),
-        slug: z.string(),
-    })),
+    requested_reviewers: z.array(
+        z.object({
+            login: z.string(),
+        }),
+    ),
+    assignees: z.array(
+        z.object({
+            login: z.string(),
+        }),
+    ),
+    requested_teams: z.array(
+        z.object({
+            name: z.string(),
+            slug: z.string(),
+        }),
+    ),
     comments_url: z.string(),
     review_comments_url: z.string(),
     // changed_files: z.number(),
@@ -40,8 +46,13 @@ export const prSchema = z.object({
 
 export type PRDetails = z.infer<typeof prSchema>;
 
-export async function getPRDetails(token: string, owner: string, repo: string, number: number): Promise<Result<PRDetails>> {
-    return await getGithub(token, `https://api.github.com/repos/${owner}/${repo}/pulls/${number}`, prSchema)
+export async function getPRDetails(
+    token: string,
+    owner: string,
+    repo: string,
+    number: number,
+): Promise<Result<PRDetails>> {
+    return await getGithub(token, `https://api.github.com/repos/${owner}/${repo}/pulls/${number}`, prSchema);
 }
 
 export const prReviewSchema = z.object({
@@ -55,6 +66,15 @@ export const prReviewSchema = z.object({
 export const prReviewsSchema = z.array(prReviewSchema);
 export type PRReview = z.infer<typeof prReviewSchema>;
 
-export async function getPRReviews(token: string, owner: string, repo: string, number: number): Promise<Result<PRReview[]>> {
-    return await getGithub(token, `https://api.github.com/repos/${owner}/${repo}/pulls/${number}/reviews`, prReviewsSchema);
+export async function getPRReviews(
+    token: string,
+    owner: string,
+    repo: string,
+    number: number,
+): Promise<Result<PRReview[]>> {
+    return await getGithub(
+        token,
+        `https://api.github.com/repos/${owner}/${repo}/pulls/${number}/reviews`,
+        prReviewsSchema,
+    );
 }

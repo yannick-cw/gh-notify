@@ -28,12 +28,12 @@ export async function readTkn(): Promise<Result<Token>> {
         authTag: z.string(),
         encrypted: z.string(),
     });
-    const tknData = await readFile(tknFile, "utf8")
+    const tknData = await readFile(tknFile, "utf8");
     const parsed = tknFileSchema.safeParse(JSON.parse(tknData));
 
     if (!parsed.success) {
-        logger.error({ err: parsed.error }, "Could not read token file.")
-        return err(configError(parsed.error.message))
+        logger.error({ err: parsed.error }, "Could not read token file.");
+        return err(configError(parsed.error.message));
     } else {
         const iv = Buffer.from(parsed.data.iv, "base64");
         const authTag = Buffer.from(parsed.data.authTag, "base64");
@@ -42,10 +42,7 @@ export async function readTkn(): Promise<Result<Token>> {
         const decipher = crypto.createDecipheriv("aes-256-gcm", env.TOKEN_ENCRYPTION_KEY, iv);
         decipher.setAuthTag(authTag);
 
-        const decrypted = Buffer.concat([
-            decipher.update(encrypted),
-            decipher.final(),
-        ]).toString("utf8");
-        return ok(decrypted)
+        const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]).toString("utf8");
+        return ok(decrypted);
     }
 }
