@@ -6,8 +6,8 @@ import {
     EnrichedNotification,
     GitNotification,
 } from "../github/notifications.js";
-import { FilterRule } from "../filters/rules.js";
-import { applyFilters } from "../filters/index.js";
+import { FilterRule } from "../config/rules.js";
+import { applyFilters } from "../config/index.js";
 import { getPRDetails, getPRReviews, prReviewsSchema, prSchema } from "../github/pull-requests.js";
 import { getIssueDetails, issueSchema } from "../github/issues.js";
 import { getComment } from "../github/comments.js";
@@ -89,8 +89,15 @@ export const fetchNotificationsTool = (tkn: string, filters: FilterRule[], since
                 return Promise.reject(result.error);
             }
 
-            const filtered = applyFilters(result.value, filters).slice(0, 5);
-            return Promise.all(filtered.map((n) => enrichNotification(tkn, n)));
+            const filtered = applyFilters(result.value, filters);
+            const enriched = await Promise.all(filtered.map((n) => enrichNotification(tkn, n)));
+            // why: drop review_requested where only teams are listed, not yannick-cw directly
+            return enriched
+                .filter((n) => {
+                    if (n.reason !== "review_requested") return true;
+                    return n.requested_reviewers?.some((r) => r.login === "yannick-cw") ?? false;
+                })
+                .slice(0, 5);
         },
     });
 

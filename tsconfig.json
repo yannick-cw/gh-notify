@@ -14,7 +14,7 @@
   "include": [
     "src/**/*",
     "tests/**/*",
-    "src/config.ts"
+    "src/config/config.ts"
   ],
   "exclude": [
     "node_modules",

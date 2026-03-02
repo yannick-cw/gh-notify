@@ -1,7 +1,7 @@
 import { runNotificationWorkflow } from "./agent/index.js";
 import { readTkn } from "./auth/token-store.js";
-import { env } from "./config.js";
-import { parseRulesFromConfig } from "./filters/index.js";
+import { defaultSince, env, parseLastRunFromConfig } from "./config/config.js";
+import { parseRulesFromConfig } from "./config/index.js";
 import { getPRDetails } from "./github/pull-requests.js";
 import { logger } from "./logger.js";
 import { sendSlackMessage } from "./slack/index.js";
@@ -11,9 +11,14 @@ async function main() {
 
     const tkn = await readTkn();
     const notificationRules = await parseRulesFromConfig();
+    const lastRunDate = await parseLastRunFromConfig();
 
     if (!notificationRules.ok) {
         return logger.error(notificationRules.error.message);
+    }
+
+    if (!lastRunDate.ok) {
+        return logger.error(lastRunDate.error.message);
     }
 
     if (!tkn.ok) {
@@ -22,7 +27,12 @@ async function main() {
 
     // logger.info(await getPRDetails(tkn.value, "commercetools", "sphere-backend", 20051))
 
-    const res = await runNotificationWorkflow(tkn.value, notificationRules.value, env.SLACK_WEBHOOK_URL ?? "");
+    const res = await runNotificationWorkflow(
+        tkn.value,
+        notificationRules.value,
+        env.SLACK_WEBHOOK_URL ?? "",
+        lastRunDate.value || defaultSince,
+    );
 
     if (!res.ok) {
         return logger.error(res.error.message);

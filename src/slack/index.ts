@@ -51,6 +51,7 @@ export function formatForSlack(decisions: SlackDecision[]): string {
 }
 
 export async function sendSlackMessage(webhookUrl: string, message: string): Promise<Result<void>> {
+    if (message === "") return ok(undefined);
     const payload = { text: message };
     const slackResult = await fetch(webhookUrl, {
         method: "POST",
@@ -61,14 +62,15 @@ export async function sendSlackMessage(webhookUrl: string, message: string): Pro
         body: JSON.stringify(payload),
     });
 
+    const slackResponseText = await slackResult.text();
+
     if (!slackResult.ok) {
-        logger.error({ status: slackResult.status }, "Posting to slack failed");
+        logger.error({ status: slackResult.status, txt: slackResponseText }, "Posting to slack failed");
         return err(apiError(slackResult.statusText));
     }
 
-    const slackResponseText = await slackResult.text();
     if (slackResponseText !== "ok") {
-        logger.error({ status: slackResult.status }, "Posting to slack failed");
+        logger.error({ status: slackResult.status, txt: slackResponseText }, "Posting to slack failed");
         return err(apiError(slackResponseText));
     }
 

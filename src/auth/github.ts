@@ -1,5 +1,5 @@
 import z from "zod";
-import { env } from "../config.js";
+import { env } from "../config/config.js";
 import { authError, err, ok, Result } from "../errors.js";
 import { logger } from "../logger.js";
 import { Hono } from "hono";

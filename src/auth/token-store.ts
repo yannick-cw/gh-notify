@@ -1,5 +1,5 @@
 import z from "zod";
-import { env } from "../config.js";
+import { env } from "../config/config.js";
 import { Token } from "./github.js";
 import crypto from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";

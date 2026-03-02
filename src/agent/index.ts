@@ -2,12 +2,13 @@ import { Mastra } from "@mastra/core";
 import { Agent } from "@mastra/core/agent";
 import { AgentStepOptions, createStep, createWorkflow } from "@mastra/core/workflows";
 import z from "zod";
-import { env, langfuseConf } from "../config.js";
+import { env, langfuseConf, LastRunDate, saveLastRunDate } from "../config/config.js";
 import { agentError, err, ok, Result } from "../errors.js";
-import { FilterRule } from "../filters/rules.js";
-import { defaultSince, EnrichedNotification, enrichedNotificationsSchema } from "../github/notifications.js";
+import { FilterRule } from "../config/rules.js";
+import { EnrichedNotification, enrichedNotificationsSchema } from "../github/notifications.js";
 import { fetchNotificationsTool, getIssueDetailsTool, getPRDetailsTool, getPRReviewsTool } from "./tools.js";
 import { formatForSlack, sendSlackMessage } from "../slack/index.js";
+import { logger } from "../logger.js";
 
 const decisionAgentOut = z.array(
     z.object({
@@ -32,9 +33,8 @@ You are an agent deciding which GitHub notifications need attention for yannick-
 Each notification has been pre-enriched with context. For each notification:
 
 1. reason is "review_requested":
-   - requested_reviewers and requested_teams are already embedded in the notification
-   - "yannick-cw" is in requested_reviewers → INFORM (direct request) STATE in summary that yannick-cw's review was requested
-   - Only teams listed, not yannick-cw directly → IGNORE
+   - Pre-filtered: only notifications where yannick-cw is directly in requested_reviewers reach you
+   - Always INFORM or URGENT and state in summary that yannick-cw's review was requested
 
 2. reason is "comment" on a PullRequest:
    - pr_participants contains logins of everyone who commented (inline + discussion)
@@ -54,6 +54,9 @@ Each notification has been pre-enriched with context. For each notification:
    - INFORM if it is a relevant update worth knowing about
    - if a notification has already been read, this has no significance for the decision, as it can be because of an email sent or so
 
+4. If not enough information is given to make a solid & good decision, chose Informed and write into the reason what information
+was missing!
+
 Return output matching the schema.
 `;
 
@@ -63,6 +66,7 @@ export async function runNotificationWorkflow(
     tkn: string,
     filters: FilterRule[],
     slackHook: string,
+    lastRun: LastRunDate,
 ): Promise<Result<Decisions>> {
     const decisionAgent = new Agent({
         id: "decision-agent",
@@ -81,7 +85,10 @@ export async function runNotificationWorkflow(
         inputSchema: z.object({}),
         outputSchema: enrichedNotificationsSchema,
         execute: async ({ inputData, requestContext }) => {
-            const result = await fetchNotificationsTool(tkn, filters, defaultSince).execute!({}, { requestContext });
+            const result = await fetchNotificationsTool(tkn, filters, lastRun.toISOString()).execute!(
+                {},
+                { requestContext },
+            );
             if (result instanceof Error) throw result;
             return result as EnrichedNotification[];
         },
@@ -93,8 +100,6 @@ export async function runNotificationWorkflow(
         inputSchema: slackExportIn,
         outputSchema: decisionAgentOut,
         execute: async ({ inputData }) => {
-            // TODO new method in slack/index.ts
-            // it formats all info very nicely, top has urgent, then inform, then ignore sections
             const formattedSlackResult = formatForSlack(inputData);
             const slackRes = await sendSlackMessage(slackHook, formattedSlackResult);
             if (!slackRes.ok) {
@@ -107,13 +112,12 @@ export async function runNotificationWorkflow(
     const decisionOpts: AgentStepOptions<Decisions> = { structuredOutput: { schema: decisionAgentOut } };
     const agentDecisionStep = createStep(decisionAgent, decisionOpts);
 
-    const triageWorkflow = createWorkflow({
-        id: "triage-workflow",
-        inputSchema: z.object({}),
+    const processNotifications = createWorkflow({
+        id: "process-notifications",
+        inputSchema: enrichedNotificationsSchema,
         outputSchema: decisionAgentOut,
     })
-        .then(fetchNotificationsStep)
-        .map(async (d) => ({ prompt: `notifications since ${defaultSince}: ${JSON.stringify(d.inputData)}` }))
+        .map(async (d) => ({ prompt: `...${JSON.stringify(d.inputData)}` }))
         .then(agentDecisionStep)
         .map(async (d) => {
             const notificationStepRes = d.getStepResult<EnrichedNotification[] | undefined>(fetchNotificationsStep.id);
@@ -139,6 +143,25 @@ export async function runNotificationWorkflow(
         .then(exportToSlack)
         .commit();
 
+    const noopStep = createStep({
+        id: "no-notifications",
+        inputSchema: enrichedNotificationsSchema,
+        outputSchema: decisionAgentOut,
+        execute: async () => [],
+    });
+
+    const triageWorkflow = createWorkflow({
+        id: "triage-workflow",
+        inputSchema: z.object({}),
+        outputSchema: decisionAgentOut,
+    })
+        .then(fetchNotificationsStep)
+        .branch([
+            [async ({ inputData }) => inputData.length === 0, noopStep],
+            [async ({ inputData }) => inputData.length > 0, processNotifications],
+        ])
+        .commit();
+
     const mastra = new Mastra({
         agents: { decisionAgent },
         workflows: { triageWorkflow },
@@ -157,5 +180,9 @@ export async function runNotificationWorkflow(
         return err(agentError(result.status));
     }
 
+    const savedDate = await saveLastRunDate();
+    if (!savedDate.ok) {
+        logger.error(savedDate.error, "Could not save date");
+    }
     return ok(result.result);
 }

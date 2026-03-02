@@ -26,9 +26,9 @@ This is a **learning project** following the curriculum in `curriculum.md`. The 
 
 ## Current Progress
 
-**Status: Phase 5**
+**Status: Phase 6**
 
-**Next up:** Phase 5, Exercise 5.3 - Integrate Slack with workflow (add as a step, not just manual call in index.ts). Also Exercise 4.5 (Summarize step - compose formatted Slack message grouped by urgency) is still pending.
+**Next up:** Exercise 6.2 (Run history), Exercise 6.3 (Dry run mode). Also Exercise 4.5 (Summarize step) is still pending.
 
 **Completed:**
 
@@ -56,6 +56,9 @@ This is a **learning project** following the curriculum in `curriculum.md`. The 
 - Phase 4, Exercise 4.4: Contextualize step (getPRReviewsTool added, agent instructions updated with ignore/inform/urgent rules per review state, since-based filtering via notification last_read_at)
 - Phase 5, Exercise 5.1: Slack webhook registered (SLACK_WEBHOOK_URL in env)
 - Phase 5, Exercise 5.2: sendSlackMessage implemented (POST to webhook, double-check HTTP status + body text, Result return type)
+- Phase 5, Exercise 5.3: Slack integrated as workflow step (exportToSlack step with formatForSlack, grouped by urgency)
+- Phase 5, Exercise 5.4: Full flow tested (Slack messages verified with real notifications)
+- Phase 6, Exercise 6.1: Scheduling via macOS crontab (hourly 7am-5pm weekdays, since parameter + last-run persistence)
 
 ## Build Commands
 
