@@ -120,25 +120,22 @@ export async function runNotificationWorkflow(
         .map(async (d) => ({ prompt: `...${JSON.stringify(d.inputData)}` }))
         .then(agentDecisionStep)
         .map(async (d) => {
-            const notificationStepRes = d.getStepResult<EnrichedNotification[] | undefined>(fetchNotificationsStep.id);
+            const notificationStepRes = d.getInitData<EnrichedNotification[]>();
 
-            if (notificationStepRes) {
-                const inputData: EnrichedResults = d.inputData.map((decision) => {
-                    const matchingEnrichedData = notificationStepRes.find((res) => res.id === decision.id);
+            const inputData: EnrichedResults = d.inputData.map((decision) => {
+                const matchingEnrichedData = notificationStepRes.find((res) => res.id === decision.id);
 
-                    return {
-                        ...decision,
-                        repo: matchingEnrichedData?.repository.full_name,
-                        title: matchingEnrichedData?.subject.title,
-                        reason: matchingEnrichedData?.reason,
-                        url: matchingEnrichedData?.subject.url
-                            .replace("api.github.com/repos", "github.com")
-                            .replace("/pulls/", "/pull/"),
-                    };
-                });
-                return inputData;
-            }
-            return d.inputData;
+                return {
+                    ...decision,
+                    repo: matchingEnrichedData?.repository.full_name,
+                    title: matchingEnrichedData?.subject.title,
+                    reason: matchingEnrichedData?.reason,
+                    url: matchingEnrichedData?.subject.url
+                        .replace("api.github.com/repos", "github.com")
+                        .replace("/pulls/", "/pull/"),
+                };
+            });
+            return inputData;
         })
         .then(exportToSlack)
         .commit();
