@@ -6,8 +6,8 @@ import { readFile, writeFile } from "node:fs/promises";
 import { logger } from "../logger.js";
 import { configError, err, ok, Result } from "../errors.js";
 
-const tknFile = ".tokens/tokens.json";
-export async function storeTkn(tkn: Token): Promise<void> {
+const defaultFile = ".tokens/tokens.json";
+export async function storeTkn(tkn: Token, tknFile: string = defaultFile): Promise<void> {
     const iv = crypto.randomBytes(12);
     const cipher = crypto.createCipheriv("aes-256-gcm", env.TOKEN_ENCRYPTION_KEY, iv);
     const encrypted = Buffer.concat([cipher.update(tkn, "utf8"), cipher.final()]);
@@ -22,7 +22,7 @@ export async function storeTkn(tkn: Token): Promise<void> {
     await writeFile(tknFile, data, "utf8");
 }
 
-export async function readTkn(): Promise<Result<Token>> {
+export async function readTkn(tknFile: string = defaultFile): Promise<Result<Token>> {
     const tknFileSchema = z.object({
         iv: z.string(),
         authTag: z.string(),

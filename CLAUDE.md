@@ -26,9 +26,9 @@ This is a **learning project** following the curriculum in `curriculum.md`. The 
 
 ## Current Progress
 
-**Status: Phase 6**
+**Status: Complete**
 
-**Next up:** Exercise 6.2 (Run history), Exercise 6.3 (Dry run mode). Also Exercise 4.5 (Summarize step) is still pending.
+**Curriculum finished.** All phases done. Project is running on cron, observable via Langfuse.
 
 **Completed:**
 
@@ -59,6 +59,11 @@ This is a **learning project** following the curriculum in `curriculum.md`. The 
 - Phase 5, Exercise 5.3: Slack integrated as workflow step (exportToSlack step with formatForSlack, grouped by urgency)
 - Phase 5, Exercise 5.4: Full flow tested (Slack messages verified with real notifications)
 - Phase 6, Exercise 6.1: Scheduling via macOS crontab (hourly 7am-5pm weekdays, since parameter + last-run persistence)
+- Phase 6, Exercise 6.2: Run history (skipped, covered by Langfuse observability)
+- Phase 6, Exercise 6.3: Dry run mode (commander CLI, --dry-run flag skips Slack send and last-run save)
+- Phase 6, Exercise 6.4: Unit tests (vitest + fast-check property tests, token-store roundtrip + invalid input robustness)
+- Phase 6, Exercise 6.5: Integration test (skipped, covered by real runs + Langfuse observability)
+- Phase 4, Exercise 4.5: Summarize step (covered by formatForSlack in slack/index.ts, grouped by urgency)
 
 ## Build Commands
 

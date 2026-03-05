@@ -67,6 +67,7 @@ export async function runNotificationWorkflow(
     filters: FilterRule[],
     slackHook: string,
     lastRun: LastRunDate,
+    dryRun: boolean,
 ): Promise<Result<Decisions>> {
     const decisionAgent = new Agent({
         id: "decision-agent",
@@ -84,7 +85,7 @@ export async function runNotificationWorkflow(
         id: "fetch-and-filter-notifications",
         inputSchema: z.object({}),
         outputSchema: enrichedNotificationsSchema,
-        execute: async ({ inputData, requestContext }) => {
+        execute: async ({ requestContext }) => {
             const result = await fetchNotificationsTool(tkn, filters, lastRun.toISOString()).execute!(
                 {},
                 { requestContext },
@@ -101,7 +102,7 @@ export async function runNotificationWorkflow(
         outputSchema: decisionAgentOut,
         execute: async ({ inputData }) => {
             const formattedSlackResult = formatForSlack(inputData);
-            const slackRes = await sendSlackMessage(slackHook, formattedSlackResult);
+            const slackRes = await sendSlackMessage(slackHook, formattedSlackResult, dryRun);
             if (!slackRes.ok) {
                 throw Error("Sending to slack failed.");
             }
@@ -177,7 +178,7 @@ export async function runNotificationWorkflow(
         return err(agentError(result.status));
     }
 
-    const savedDate = await saveLastRunDate();
+    const savedDate = await saveLastRunDate(dryRun);
     if (!savedDate.ok) {
         logger.error(savedDate.error, "Could not save date");
     }

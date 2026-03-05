@@ -46,8 +46,8 @@ export type LastRunDate = Date & { readonly __brand: "lastRun" };
 function lastRunDate(d: Date): LastRunDate {
     return d as LastRunDate;
 }
-const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
-export const defaultSince = lastRunDate(new Date(Date.now() - THREE_DAYS_MS));
+const ONE_DAY = 1 * 24 * 60 * 60 * 1000;
+export const defaultSince = lastRunDate(new Date(Date.now() - ONE_DAY));
 
 export async function parseLastRunFromConfig(): Promise<Result<LastRunDate | undefined>> {
     const rulesFile = await readFile(lastRunFile, "utf8");
@@ -63,8 +63,13 @@ export async function parseLastRunFromConfig(): Promise<Result<LastRunDate | und
     return ok(parsed.data ? lastRunDate(parsed.data) : undefined);
 }
 
-export async function saveLastRunDate(): Promise<Result<void>> {
-    return writeFile(lastRunFile, JSON.stringify(Date.now()), "utf8")
-        .then(() => ok(undefined))
-        .catch((reason) => err(configError(reason.toString())));
+export async function saveLastRunDate(dryRun: boolean): Promise<Result<void>> {
+    if (!dryRun) {
+        return writeFile(lastRunFile, JSON.stringify(Date.now()), "utf8")
+            .then(() => ok(undefined))
+            .catch((reason) => err(configError(reason.toString())));
+    } else {
+        logger.info("Dry run, would have stored current data.");
+        return ok(undefined);
+    }
 }

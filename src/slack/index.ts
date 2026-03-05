@@ -50,28 +50,32 @@ export function formatForSlack(decisions: SlackDecision[]): string {
         .join("\n\n");
 }
 
-export async function sendSlackMessage(webhookUrl: string, message: string): Promise<Result<void>> {
+export async function sendSlackMessage(webhookUrl: string, message: string, dryRun: boolean): Promise<Result<void>> {
     if (message === "") return ok(undefined);
     const payload = { text: message };
-    const slackResult = await fetch(webhookUrl, {
-        method: "POST",
-        headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-    });
+    if (!dryRun) {
+        const slackResult = await fetch(webhookUrl, {
+            method: "POST",
+            headers: {
+                Accept: "application/json",
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify(payload),
+        });
 
-    const slackResponseText = await slackResult.text();
+        const slackResponseText = await slackResult.text();
 
-    if (!slackResult.ok) {
-        logger.error({ status: slackResult.status, txt: slackResponseText }, "Posting to slack failed");
-        return err(apiError(slackResult.statusText));
-    }
+        if (!slackResult.ok) {
+            logger.error({ status: slackResult.status, txt: slackResponseText }, "Posting to slack failed");
+            return err(apiError(slackResult.statusText));
+        }
 
-    if (slackResponseText !== "ok") {
-        logger.error({ status: slackResult.status, txt: slackResponseText }, "Posting to slack failed");
-        return err(apiError(slackResponseText));
+        if (slackResponseText !== "ok") {
+            logger.error({ status: slackResult.status, txt: slackResponseText }, "Posting to slack failed");
+            return err(apiError(slackResponseText));
+        }
+    } else {
+        logger.info(payload, "Dry rund, would have posted to slack.");
     }
 
     return ok(undefined);

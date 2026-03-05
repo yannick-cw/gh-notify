@@ -1,7 +1,6 @@
 import z from "zod";
-import { ok, Result } from "../errors.js";
+import { Result } from "../errors.js";
 import { getGithub } from "./api.js";
-import { logger } from "../logger.js";
 
 export const prSchema = z.object({
     title: z.string(),

@@ -1,12 +1,16 @@
+import { Command } from "commander";
 import { runNotificationWorkflow } from "./agent/index.js";
 import { readTkn } from "./auth/token-store.js";
 import { defaultSince, env, parseLastRunFromConfig } from "./config/config.js";
 import { parseRulesFromConfig } from "./config/index.js";
-import { getPRDetails } from "./github/pull-requests.js";
 import { logger } from "./logger.js";
-import { sendSlackMessage } from "./slack/index.js";
 
 async function main() {
+    const program = new Command();
+
+    program.option("--dry-run", "Log output, but do not send to Slack and do not update last run date.").parse();
+    const opts = program.opts();
+
     logger.info(env, "booting up...");
 
     const tkn = await readTkn();
@@ -25,13 +29,12 @@ async function main() {
         return logger.error(tkn.error.message);
     }
 
-    // logger.info(await getPRDetails(tkn.value, "commercetools", "sphere-backend", 20051))
-
     const res = await runNotificationWorkflow(
         tkn.value,
         notificationRules.value,
         env.SLACK_WEBHOOK_URL ?? "",
         lastRunDate.value || defaultSince,
+        opts.dryRun,
     );
 
     if (!res.ok) {

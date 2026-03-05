@@ -4,14 +4,14 @@ import { authError, err, ok, Result } from "../errors.js";
 import { logger } from "../logger.js";
 import { Hono } from "hono";
 import { serve, ServerType } from "@hono/node-server";
-import { readTkn, storeTkn } from "./token-store.js";
+import { storeTkn } from "./token-store.js";
 import { exec } from "node:child_process";
 
 const callBackURL = "http://localhost:3000/callback";
 
 const app = new Hono();
-var localState: string;
-var closableServer: ServerType;
+let localState: string;
+let closableServer: ServerType;
 
 app.get("/", (c) => {
     localState = crypto.randomUUID();

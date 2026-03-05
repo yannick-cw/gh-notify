@@ -92,12 +92,14 @@ export const fetchNotificationsTool = (tkn: string, filters: FilterRule[], since
             const filtered = applyFilters(result.value, filters);
             const enriched = await Promise.all(filtered.map((n) => enrichNotification(tkn, n)));
             // why: drop review_requested where only teams are listed, not yannick-cw directly
-            return enriched
-                .filter((n) => {
-                    if (n.reason !== "review_requested") return true;
-                    return n.requested_reviewers?.some((r) => r.login === "yannick-cw") ?? false;
-                })
-                .slice(0, 5);
+            return enriched.filter((n) => {
+                if (n.reason !== "review_requested") return true;
+                return (
+                    (n.requested_reviewers?.some((r) => r.login === "yannick-cw") ||
+                        n.pr_participants?.some((p) => p.login === "yannick-cw")) ??
+                    false
+                );
+            });
         },
     });
 
